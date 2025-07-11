@@ -5,9 +5,33 @@ module.exports = function (app) {
 
   app.route('/api/issues/:project')
 
-    .get(function (req, res) {
-      let project = req.params.project;
+    .get(async (req, res) => {
+      const project = req.params;
+      const querys = req.query;
 
+      try {
+        let filterQuery = {};
+        if (querys) {
+
+          filterQuery = Object.fromEntries(
+            Object.entries(querys).filter((query) => {
+              return query
+            })
+          );
+        }
+
+        const filter = { ...project, ...filterQuery };
+        const issues = await Issue.find(filter);
+
+        res
+          .status(200)
+          .send(issues);
+
+      } catch (err) {
+        res
+          .status(404)
+          .json({ error: 'No document with these characteristics was found.' });
+      }
     })
 
     .post(async (req, res) => {
@@ -31,6 +55,7 @@ module.exports = function (app) {
         });
 
         const savedIssue = await issue.save();
+
         res
           .status(201)
           .json(savedIssue);
