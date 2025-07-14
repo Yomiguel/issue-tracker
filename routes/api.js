@@ -23,22 +23,28 @@ module.exports = function (app) {
         const filter = { ...project, ...filterQuery };
         const issues = await Issue.find(filter);
 
-        res
+        return res
           .status(200)
           .send(issues);
 
       } catch (err) {
-        res
+        return res
           .status(404)
           .json({ error: 'No document with these characteristics was found.' });
       }
     })
 
     .post(async (req, res) => {
-      let project = req.params.project;
-      const { issue_title, issue_text, created_by, assigned_to, status_text } = req.body;
+      const project = req.params.project;
+      const {
+        issue_title = "",
+        issue_text = "",
+        created_by = "",
+        assigned_to,
+        status_text
+      } = req.body;
 
-      if (!issue_title || !issue_text || !created_by) {
+      if (!issue_title?.trim() || !issue_text?.trim() || !created_by?.trim()) {
         return res
           .status(400)
           .json({ error: 'required field(s) missing' });
@@ -56,24 +62,77 @@ module.exports = function (app) {
 
         const savedIssue = await issue.save();
 
-        res
+        return res
           .status(201)
           .json(savedIssue);
       } catch (err) {
-        res
+        return res
           .status(500)
           .json({ error: 'error saving issue' });
       }
     })
 
-    .put(function (req, res) {
-      let project = req.params.project;
+    .put(async (req, res) => {
+      const project = req.params;
+      const { _id, ...updateFields } = req.body;
 
+      if (!_id) {
+        return res
+          .status(400)
+          .json({ error: 'missing _id' });
+      }
+
+      const updates = {};
+
+      for (let key in updateFields) {
+        if (updateFields.hasOwnProperty(key) && key !== '_id') {
+          updates[key] = updateFields[key];
+        }
+      }
+
+      if (!Object.keys(updates).length) {
+        return res
+          .status(400)
+          .json({ error: 'no update field(s) sent', '_id': _id });
+      }
+
+      updates.updated_on = new Date();
+
+      try {
+        const issueModified = await Issue.findByIdAndUpdate(_id, updates);
+        return res
+          .status(200)
+          .json({ result: 'successfully updated', '_id': _id });
+      } catch {
+        return res
+          .status(500)
+          .json({ error: 'could not update', '_id': _id });
+      }
     })
 
-    .delete(function (req, res) {
-      let project = req.params.project;
+    .delete(async (req, res) => {
+      const project = req.params.project;
+      const _id = req.body._id
 
+      if (!_id) {
+        return res
+          .status(400)
+          .json({ error: 'missing _id' });
+      }
+
+      try {
+        const deletedIssue = await Issue.findByIdAndDelete(_id);
+
+        if (!deletedIssue) {
+          return res.status(500).json({ error: 'could not delete', '_id': _id });
+        }
+        return res
+          .status(200)
+          .json({ result: 'successfully deleted', '_id': _id });
+      } catch {
+        return res
+          .status(500)
+          .json({ error: 'could not delete', '_id': _id })
+      }
     });
-
 };
